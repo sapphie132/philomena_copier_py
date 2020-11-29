@@ -13,8 +13,9 @@ import time
 # Matches a domain, ignoring http/https and the trailing /
 domain_pattern: Pattern = compile(r"^(?:https?:\/\/)?(.+?\.\w+?)\/?$")
 
-# Matches an image link, such as >>123, >>123t, or >>123p
-image_link_pattern: Pattern = compile(r">>([0-9]+)(t|p?)")
+# Matches an image link, such as >>123, >>123t, or >>123p. The leftmost non-capturing group
+# is there to handle weird edge cases
+image_link_pattern: Pattern = compile(r"(?:^|[^=]{1,2}|[^=]=|^=)>>([0-9]+)(t|p?)")
 
 # Matches a relative link, which are done like: "this":http://example.com
 relative_link_pattern: Pattern = compile(r'"(.+)":(\/.+) ?')
@@ -35,9 +36,11 @@ per_page = 50
 
 # Returns true if reverse search finds something
 def reverse_search(booru: str, api_key: str, image: dict):
+    # For debugging
+    #return True
     img_url = image["view_url"]
-    j = {"url": img_url, "distance": 0.1}
-    url = f"https://{booru}/api/v1/json/search/reverse"
+    j = {"url": img_url, "distance": 0.1, "key":api_key}
+    url = f"https://{booru}/api/v1/json/search/reverse?key={api_key}"
     r = requests.post(url, data=j)
     images = r.json()
     return images["total"]
@@ -144,14 +147,15 @@ def main():
             input()
         except EOFError:
             pass
-        current_image = 1
+        current_image = 0
         current_retry_delay = init_retry_delay
 
         while len(search_images["images"]) > 0:
             for image in search_images["images"]:
+                current_image += 1
                 current_retry_delay = init_retry_delay
                 new_description = sub(image_link_pattern, lambda m: replace_image_link(m, source_booru), image["description"])
-                new_description = sub(relative_link_pattern, lambda m: replace_relative_link(m, source), new_description)
+                new_description = sub(relative_link_pattern, lambda m: replace_relative_link(m, source_booru), new_description)
                 image["description"] = new_description
                 image["tags"].append(f"{source_booru_short} import")
 
@@ -183,7 +187,6 @@ def main():
                 if attempts_at_max_delay == max_attempts_at_max_delay:
                     print("Max attempts reached; moving onto next image.")
 
-                current_image += 1
                 # To avoid sending too many requests
                 time.sleep(init_retry_delay)
 
