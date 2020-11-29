@@ -142,9 +142,12 @@ def main():
         total_images = search_images["total"]
 
         print(f"There are {total_images} images in this query")
-        print(f"Ensure the query and image count are correct! If not, Ctrl-C to exit. Otherwise, press enter to continue")
+        print(f"Ensure the query and image count are correct! If not, Ctrl-C to exit.")
+        use_reverse = True
         try:
-            input()
+            r = input("Use reverse search? [Y/n]")
+            if r == "n": 
+                use_reverse = False
         except EOFError:
             pass
         current_image = 0
@@ -162,10 +165,12 @@ def main():
                 image_id = image["id"]
                 print(f"Uploading image {current_image}/{total_images} ({image_id})")
 
-                rev = reverse_search(target_booru, target_api_key, image)
-                if rev > 0:
-                    print(f"Reverse search found {rev} matching images (skipping)")
-                    continue
+                if use_reverse:
+                    print("Reverse searching…")
+                    rev = reverse_search(target_booru, target_api_key, image)
+                    if rev > 0:
+                        print(f"Reverse search found {rev} matching images (skipping)")
+                        continue
 
                 attempts_at_max_delay = 0
                 while attempts_at_max_delay < max_attempts_at_max_delay:
