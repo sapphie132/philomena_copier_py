@@ -140,7 +140,10 @@ def main():
 
         print(f"There are {total_images} images in this query")
         print(f"Ensure the query and image count are correct! If not, Ctrl-C to exit. Otherwise, press enter to continue")
-        input()
+        try:
+            input()
+        except EOFError:
+            pass
         current_image = 1
         current_retry_delay = init_retry_delay
 
