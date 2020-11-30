@@ -1,4 +1,4 @@
-#!python3
+#!/usr/bin/python3
 from re import compile, Pattern, Match, sub
 from datetime import timedelta
 import requests
@@ -9,6 +9,7 @@ import time
 # - Find/check twibooru upload route (seriously why the fuck would you opt to use the old API fuck u)
 # - Write unit tests
 # - Add exception handling
+# -! Check tag overlap for successful reverse search
 
 # Matches a domain, ignoring http/https and the trailing /
 domain_pattern: Pattern = compile(r"^(?:https?:\/\/)?(.+?\.\w+?)\/?$")
