@@ -42,8 +42,17 @@ def reverse_search(booru: str, api_key: str, image: dict):
     j = {"url": img_url, "distance": 0.1, "key":api_key}
     url = f"https://{booru}/api/v1/json/search/reverse?key={api_key}"
     r = requests.post(url, data=j)
-    images = r.json()
-    return images["total"]
+    try:
+        images = r.json()
+        if type(images) == dict and "total" in images:
+            return images["total"]
+        else:
+            return []
+
+    # Probably a server-side error
+    except json.JSONDecodeError:
+        return []
+
 
 # To use in a GET request
 def get_search_query_url(booru: str, api_key: str, query: str, page: int):
