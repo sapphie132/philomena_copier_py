@@ -48,11 +48,11 @@ def reverse_search(booru: str, api_key: str, image: dict):
         if type(images) == dict and "total" in images:
             return images["total"]
         else:
-            return []
+            return 0
 
     # Probably a server-side error
     except json.JSONDecodeError:
-        return []
+        return 0
 
 
 # To use in a GET request
