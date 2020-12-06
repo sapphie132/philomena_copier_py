@@ -261,7 +261,6 @@ def main():
                 current_retry_delay = init_retry_delay
                 image["description"] = change_description(image["description"], config)
                 image["tags"] = change_tags(image["tags"], config)
-                print(image["tags"])
 
                 image_id = image["id"]
                 print(f"Uploading image {current_image}/{total_images} ({image_id})")
