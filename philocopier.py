@@ -4,6 +4,7 @@ from datetime import timedelta
 import requests
 import json
 import time
+import sys
 
 #TODO:
 # - Find/check twibooru upload route (seriously why the fuck would you opt to use the old API fuck u)
@@ -34,6 +35,26 @@ init_retry_delay = 0.25
 max_retry_delay = 512
 
 per_page = 50
+
+class Config(object):
+    target_api_key: str
+    source_api_key: str
+    source_booru: str
+    source_booru_short: str
+    target_booru: str
+    reverse_search: bool
+    tag_mapping: dict
+
+    def __init__(self, source_booru, source_api_key, target_api_key, target_booru, use_reverse = True, tag_mapping = None):
+        self.tag_mapping = tag_mapping
+        self.source_booru = source_booru
+        self.source_api_key = source_api_key
+        self.target_api_key = target_api_key
+        self.target_booru = target_booru
+        self.reverse_search = use_reverse
+
+        # Strip the domain name
+        self.source_booru_short = source_booru[:source_booru.rfind(".")]
 
 # Returns true if reverse search finds something
 def reverse_search(booru: str, api_key: str, image: dict):
@@ -122,9 +143,45 @@ def upload_image(image: dict, booru: str, api_key: str):
         return False
 
 version = "1.0"
+# God I hate python
+def dict_to_config(d) -> Config:
+        target_api_key = d.get("target_api_key")
+        if target_api_key is None:
+            raise ValueError("target_api_key is mandatory")
 
-def main():
-    try:
+        source_api_key = d.get("source_api_key")
+        if source_api_key is None:
+            raise ValueError("source_api_key is mandatory")
+
+        source_booru   = d.get("source_booru")
+        if source_booru is None:
+            raise ValueError("source_booru is mandatory")
+
+        target_booru   = d.get("target_booru")
+        if target_booru is None:
+            raise ValueError("target_booru is mandatory")
+
+        reverse_search = d.get("reverse_search", True)
+        if type(reverse_search) != bool:
+            raise ValueError("reverse_search has to be a boolean value")
+
+        tag_mapping    = d.get("tag_mapping")
+        if tag_mapping is not None and type(tag_mapping) != dict:
+            raise ValueError("tag_mapping has to be an object")
+
+        return Config(source_booru, source_api_key, target_api_key, target_booru, reverse_search, tag_mapping)
+
+
+
+def get_config():
+    if len(sys.argv) > 1:
+        config_path = "config.json" # yeah, can't be assed
+        with open(config_path) as config_file:
+            config_dict = json.load(config_file)
+            config = dict_to_config(config_dict)
+
+        search_query = " ".join(sys.argv[1:])
+    else:
         print(f"Pylomena copier v{version}")
         print()
         print("Ensure your filter are set correctly on the source booru. "\
@@ -135,19 +192,17 @@ def main():
         # Get booru info
         source_booru = get_input_with_pattern(domain_pattern, "Enter source booru url: ")
         source_api_key = get_input_with_pattern(api_key_pattern, "Enter source booru API key: ")
-        source_booru_short = source_booru[:source_booru.rfind(".")]
         target_booru = get_input_with_pattern(domain_pattern, "Enter target booru url: ")
         target_api_key = get_input_with_pattern(api_key_pattern, "Enter target booru API key: ")
 
         # Get query
         print("Enter query to copy from the source booru to the target booru. Any query that can be made on the site will work.")
         search_query = input("Query: ").strip()
-    
-        current_page = 1
-        search_images = get_search_query_images(source_booru, source_api_key, search_query, current_page)
+
+        search_images = get_search_query_images(source_booru, source_api_key, search_query, page=1) # page is irrelevant for this
         if len(search_images) == 0:
             print("This query has no images! Double-check the query and try again.")
-            return
+            raise ValueError("No images found")
     
         total_images = search_images["total"]
 
@@ -160,24 +215,60 @@ def main():
                 use_reverse = False
         except EOFError:
             pass
+
+        config = Config(source_booru, source_api_key, target_api_key, target_booru, use_reverse)
+
+    return config, search_query
+
+def change_tags(tags: list, config: Config) -> list:
+    if config.tag_mapping is not None:
+        result = []
+        for tag in tags:
+            if tag in config.tag_mapping:
+                replacement = config.tag_mapping[tag]
+                if type(replacement) == list:
+                    for rep in replacement:
+                        result.append(rep)
+                elif replacement is not None:
+                    result.append(replacement)
+                # if the replacement is none, then just delete the dag
+            else:
+                result.append(tag) # Don't change tag
+    else:
+        result = tags
+
+    result.append(f"{config.source_booru_short} import")
+    return result
+
+def change_description(description: str, config: Config):
+    new_description = sub(image_link_pattern, lambda m: replace_image_link(m, config.source_booru), description)
+    new_description = sub(relative_link_pattern, lambda m: replace_relative_link(m, config.source_booru), new_description)
+    return new_description
+
+def main():
+    try:
+        config, search_query = get_config()
+
+        current_page = 1
         current_image = 0
         current_retry_delay = init_retry_delay
+        search_images = get_search_query_images(config.source_booru, config.source_api_key, search_query, page=current_page)
 
+        total_images = search_images["total"]
         while len(search_images["images"]) > 0:
             for image in search_images["images"]:
                 current_image += 1
                 current_retry_delay = init_retry_delay
-                new_description = sub(image_link_pattern, lambda m: replace_image_link(m, source_booru), image["description"])
-                new_description = sub(relative_link_pattern, lambda m: replace_relative_link(m, source_booru), new_description)
-                image["description"] = new_description
-                image["tags"].append(f"{source_booru_short} import")
+                image["description"] = change_description(image["description"], config)
+                image["tags"] = change_tags(image["tags"], config)
+                print(image["tags"])
 
                 image_id = image["id"]
                 print(f"Uploading image {current_image}/{total_images} ({image_id})")
 
-                if use_reverse:
+                if config.reverse_search:
                     print("Reverse searching…")
-                    rev = reverse_search(target_booru, target_api_key, image)
+                    rev = reverse_search(config.target_booru, config.target_api_key, image)
                     if rev > 0:
                         print(f"Reverse search found {rev} matching images (skipping)")
                         continue
@@ -186,7 +277,7 @@ def main():
                 while attempts_at_max_delay < max_attempts_at_max_delay:
 
                     # Upload succeeded
-                    if upload_image(image, target_booru, target_api_key):
+                    if upload_image(image, config.target_booru, config.target_api_key):
                         break
                     # Upload failed
                     else:
@@ -211,13 +302,11 @@ def main():
 
             search_images = None
             while search_images is None:
-                search_images = get_search_query_images(source_booru, source_api_key, search_query, current_page)
+                search_images = get_search_query_images(config.source_booru, config.source_api_key, search_query, current_page)
                 time.sleep(current_retry_delay)
                 if current_retry_delay < max_retry_delay:
                     current_retry_delay *= 2
 
-                
-            
 
 
     except KeyboardInterrupt:
