@@ -35,6 +35,7 @@ init_retry_delay = 0.25
 max_retry_delay = 512
 
 per_page = 50
+timeout_seconds = 20
 
 class Config(object):
     target_api_key: str
@@ -57,14 +58,15 @@ class Config(object):
         self.source_booru_short = source_booru[:source_booru.rfind(".")]
 
 # Returns true if reverse search finds something
+# If a server-side error occurs, we treat that as "no results"
 def reverse_search(booru: str, api_key: str, image: dict):
     # For debugging
     #return True
     img_url = image["view_url"]
     j = {"url": img_url, "distance": 0.1, "key":api_key}
     url = f"https://{booru}/api/v1/json/search/reverse?key={api_key}"
-    r = requests.post(url, data=j)
     try:
+        r = requests.post(url, data=j, timeout=timeout_seconds)
         images = r.json()
         if type(images) == dict and "total" in images:
             return images["total"]
@@ -74,6 +76,10 @@ def reverse_search(booru: str, api_key: str, image: dict):
     # Probably a server-side error
     except json.JSONDecodeError:
         return 0
+    except RequestException as e:
+        print(f"RequestException occurred: {e}")
+        return 0
+
 
 
 # To use in a GET request
@@ -110,18 +116,22 @@ def replace_relative_link(match: Match, booru: str):
 
 def get_search_query_images(booru: str, api_key: str, query: str, page: int):
     query_url: str = get_search_query_url(booru, api_key, query, page)
-    response = requests.get(query_url)
-    images_received = response.json()
-    images = images_received
-    # Adapts an image from the old api to the new one
-    # This doesn't adapt *all* the changes, just the ones that are relevant
-    if booru == "twibooru.org":
-        images["images"] = images["search"]
-        del images["search"]
-        for image in images["images"]:
-            image["tags"] = image["tags"].split(", ")
-    
-    return images
+    try:
+        response = requests.get(query_url, timeout=timeout_seconds)
+        images_received = response.json()
+        images = images_received
+        # Adapts an image from the old api to the new one
+        # This doesn't adapt *all* the changes, just the ones that are relevant
+        if booru == "twibooru.org":
+            images["images"] = images["search"]
+            del images["search"]
+            for image in images["images"]:
+                image["tags"] = image["tags"].split(", ")
+        
+        return images
+    except RequestException as e:
+        print(f"RequestException occurred: {e}")
+        return None
 
         
 def upload_image(image: dict, booru: str, api_key: str):
@@ -131,15 +141,18 @@ def upload_image(image: dict, booru: str, api_key: str):
     image_to_upload = {"description": image["description"], "source_url": image["source_url"], "tag_input": tag_string}
     upload_image_body = {"image": image_to_upload, "url": image["view_url"]}
 
-    r = requests.post(upload_url, json=upload_image_body)
-    if r.status_code == requests.codes.ok:
-        return True
-        print(f"Error uploading image ({r.status_code})(this could be because the image is already uploaded)")
-    else:
-        print(f"Error uploading image ({r.status_code})")
-        if r.status_code == requests.codes.bad_request:
-            return True # Lazy hack; technically, the upload did succeed, since the file is already on the server
-            print("(This could be because the image is already present on the target site—duplicate hash)")
+    try:
+        r = requests.post(upload_url, json=upload_image_body, timeout=timeout_seconds)
+        if r.status_code == requests.codes.ok:
+            return True
+        else:
+            print(f"Error uploading image ({r.status_code})")
+            if r.status_code == requests.codes.bad_request:
+                return True # Lazy hack; technically, the upload did succeed, since the file is already on the server
+                print("This is because the hash is already present on the server")
+            return False
+    except RequestException as e:
+        print(f"RequestException occurred: {e}")
         return False
 
 version = "1.0"
@@ -200,7 +213,7 @@ def get_config():
         search_query = input("Query: ").strip()
 
         search_images = get_search_query_images(source_booru, source_api_key, search_query, page=1) # page is irrelevant for this
-        if len(search_images) == 0:
+        if search_images is None or len(search_images["images"]) == 0:
             print("This query has no images! Double-check the query and try again.")
             raise ValueError("No images found")
     
