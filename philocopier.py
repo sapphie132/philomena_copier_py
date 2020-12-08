@@ -284,6 +284,8 @@ def main():
                     if rev > 0:
                         print(f"Reverse search found {rev} matching images (skipping)")
                         continue
+                    else:
+                        print("No results found, uploading…")
 
                 attempts_at_max_delay = 0
                 while attempts_at_max_delay < max_attempts_at_max_delay:
