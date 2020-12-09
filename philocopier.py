@@ -2,6 +2,7 @@
 from re import compile, Pattern, Match, sub
 from datetime import timedelta
 import requests
+from requests import RequestException
 import json
 import time
 import sys
