@@ -25,3 +25,21 @@ To speed up inputting the booru urls and keys, you can type the following (repla
 <use reverse search?>
 
 ```
+## Config file
+
+Alternatively, you can pass your query as a parameter, in which case the script will automatically search for `config.json`. 
+Example of a (fully populated) config:
+```json
+{
+  "target_booru": "ponybooru.org",
+  "source_booru": "derpibooru.org",
+  "source_api_key": "123456789abcdefghijk",
+  "target_api_key": "123456789abcdefghijk", 
+  "tag_mapping": {"adventure in the comments": null, 
+                  "princess celestia": ["princess celestia", "best pony"],
+                  "derpibooru exclusive":"ironic tag"},
+  "reverse_search": true
+}
+```
+`tag_mapping` is optional, but can be useful if you replace tags (either by an individual tag, or by an array of tags), or remove them (by setting it to `null` in the file). The above example removes the tag `adventure in the comments`, replaces `princess celestia` with `princess celestia` and `best pony` (i.e., adds `best pony` to any Celestia pic). You can figure out what the last entry does.
+`reverse_search` is also optional, but defaults to `true`.
