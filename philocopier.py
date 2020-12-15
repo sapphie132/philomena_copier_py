@@ -18,7 +18,7 @@ domain_pattern: Pattern = compile(r"^(?:https?:\/\/)?(.+?\.\w+?)\/?$")
 
 # Matches an image link, such as >>123, >>123t, or >>123p. The leftmost non-capturing group
 # is there to handle weird edge cases
-image_link_pattern: Pattern = compile(r"(?:^|[^=]{1,2}|[^=]=|^=)>>([0-9]+)(t|p?)")
+image_link_pattern: Pattern = compile(r"(?:^|[^=]{1,2}|[^=]=|^=)>>([0-9]+)(t|p|s?)")
 
 # Matches a relative link, which are done like: "this":http://example.com
 relative_link_pattern: Pattern = compile(r'"(.+)":(\/.+) ?')
