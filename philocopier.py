@@ -39,7 +39,7 @@ init_retry_delay = 0.25
 max_retry_delay = 256
 
 per_page = 50
-timeout_seconds = 20
+timeout_seconds = 60
 
 class Config(object):
     target_api_key: str
