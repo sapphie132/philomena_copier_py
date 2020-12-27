@@ -103,6 +103,8 @@ def get_search_query_url(booru: str, api_key: str, query: str, page: int, filter
     if filter_id is not None:
         req = req + f"&{filter_id}"
 
+    return req
+
 # To use in a POST request
 def get_upload_url(booru: str, api_key: str):
     if booru == "twibooru.org":
