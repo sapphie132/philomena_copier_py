@@ -204,8 +204,9 @@ def dict_to_config(d) -> Config:
 
         source_filter_id = d.get("source_filter_id") # Allowed to be None
 
-        return Config(  source_booru=source_booru, source_api_key=source_api_key,\
-                        target_api_key, target_booru, reverse_search, tag_mapping,\
+        return Config(  source_booru = source_booru, source_api_key = source_api_key,\
+                        target_api_key = target_api_key, target_booru = target_booru,\
+                        use_reverse = reverse_search, tag_mapping = tag_mapping,\
                         source_filter_id = source_filter_id)
 
 
