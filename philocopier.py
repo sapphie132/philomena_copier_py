@@ -3,6 +3,7 @@ from re import compile, Pattern, Match, sub
 from datetime import timedelta
 import requests
 from requests import RequestException
+from bs4 import BeautifulSoup
 import json
 import time
 import sys
@@ -10,7 +11,6 @@ import sys
 #TODO:
 # - Find/check twibooru upload route (seriously why the fuck would you opt to use the old API fuck u)
 # - Write unit tests
-# - Add exception handling
 # -! Check tag overlap for successful reverse search
 
 # Matches a domain, ignoring http/https and the trailing /
@@ -26,6 +26,9 @@ relative_link_pattern: Pattern = compile(r'"(.+)":(\/.+) ?')
 # Matches an api key
 api_key_pattern = compile(r"^(.{20})$")
 
+# Matches an integer
+source_filter_pattern = compile(r"^d+$")
+
 # Maximum number of retries once the longest timeout has been reached (some images cannot be uploaded)
 # With the default parameters, this represents ~3000 seconds on one attempt. It's a fair assumption
 # that it will not work
@@ -33,7 +36,7 @@ max_attempts_at_max_delay = 2
 
 # Retry delays, in seconds
 init_retry_delay = 0.25
-max_retry_delay = 512
+max_retry_delay = 256
 
 per_page = 50
 timeout_seconds = 20
@@ -46,14 +49,16 @@ class Config(object):
     target_booru: str
     reverse_search: bool
     tag_mapping: dict
+    source_filter_id: int
 
-    def __init__(self, source_booru, source_api_key, target_api_key, target_booru, use_reverse = True, tag_mapping = None):
+    def __init__(self, source_booru, source_api_key, target_api_key, target_booru, use_reverse = True, tag_mapping = None, source_filter_id = None):
         self.tag_mapping = tag_mapping
         self.source_booru = source_booru
         self.source_api_key = source_api_key
         self.target_api_key = target_api_key
         self.target_booru = target_booru
         self.reverse_search = use_reverse
+        self.source_filter_id = source_filter_id
 
         # Strip the domain name
         self.source_booru_short = source_booru[:source_booru.rfind(".")]
@@ -81,15 +86,22 @@ def reverse_search(booru: str, api_key: str, image: dict):
         print(f"RequestException occurred: {e}")
         return 0
 
+# Does nothing for now, ignore
+def get_svg_url(booru, image_id) -> str:
+    image_url = "https://{booru}/images/{image_id}"
 
 
 # To use in a GET request
-def get_search_query_url(booru: str, api_key: str, query: str, page: int):
+def get_search_query_url(booru: str, api_key: str, query: str, page: int, filter_id: int):
     # Twibooru uses the old api. I don't know of other sites that do
+    req = None
     if booru == "twibooru.org":
-        return f"https://{booru}/search.json?key={api_key}&page={page}&per_page={per_page}&q={query}&sf=created_at&sd=asc"
+        req = f"https://{booru}/search.json?key={api_key}&page={page}&per_page={per_page}&q={query}&sf=created_at&sd=asc"
     else:
-        return f"https://{booru}/api/v1/json/search/images?key={api_key}&page={page}&per_page={per_page}&q={query}&sf=created_at&sd=asc"
+        req = f"https://{booru}/api/v1/json/search/images?key={api_key}&page={page}&per_page={per_page}&q={query}&sf=created_at&sd=asc"
+
+    if filter_id is not None:
+        req = req + f"&{filter_id}"
 
 # To use in a POST request
 def get_upload_url(booru: str, api_key: str):
@@ -115,8 +127,15 @@ def replace_image_link(match: Match, booru: str):
 def replace_relative_link(match: Match, booru: str):
     return f"\"{match[1]}\":https://{booru}{match[2]}"
 
-def get_search_query_images(booru: str, api_key: str, query: str, page: int):
-    query_url: str = get_search_query_url(booru, api_key, query, page)
+def get_imgs_from_config(config: Config, query: str, page: int):
+    return get_search_query_images( booru     = config.source_booru,\
+                                    api_key   = config.source_api_key,\
+                                    filter_id = config.source_filter_id,\
+                                    query     = query,\
+                                    page      = page)
+
+def get_search_query_images(booru: str, api_key: str, query: str, page: int, filter_id = None):
+    query_url: str = get_search_query_url(booru, api_key, query, page, filter_id)
     try:
         response = requests.get(query_url, timeout=timeout_seconds)
         images_received = response.json()
@@ -157,7 +176,7 @@ def upload_image(image: dict, booru: str, api_key: str):
         return False
 
 version = "1.0"
-# God I hate python
+# God I hate python. Just let me have a unified constructor
 def dict_to_config(d) -> Config:
         target_api_key = d.get("target_api_key")
         if target_api_key is None:
@@ -183,7 +202,11 @@ def dict_to_config(d) -> Config:
         if tag_mapping is not None and type(tag_mapping) != dict:
             raise ValueError("tag_mapping has to be an object")
 
-        return Config(source_booru, source_api_key, target_api_key, target_booru, reverse_search, tag_mapping)
+        source_filter_id = d.get("source_filter_id") # Allowed to be None
+
+        return Config(  source_booru=source_booru, source_api_key=source_api_key,\
+                        target_api_key, target_booru, reverse_search, tag_mapping,\
+                        source_filter_id = source_filter_id)
 
 
 
@@ -213,7 +236,10 @@ def get_config():
         print("Enter query to copy from the source booru to the target booru. Any query that can be made on the site will work.")
         search_query = input("Query: ").strip()
 
-        search_images = get_search_query_images(source_booru, source_api_key, search_query, page=1) # page is irrelevant for this
+        search_images = get_search_query_images(\
+                source_booru, source_api_key,\
+                search_query, page = 1) # page is irrelevant for this, we just want the count
+
         if search_images is None or len(search_images["images"]) == 0:
             print("This query has no images! Double-check the query and try again.")
             raise ValueError("No images found")
@@ -230,7 +256,8 @@ def get_config():
         except EOFError:
             pass
 
-        config = Config(source_booru, source_api_key, target_api_key, target_booru, use_reverse)
+        config = Config(source_booru, source_api_key, target_api_key, target_booru, use_reverse,\
+                        source_filter_id = None) # Honestly, I should have abandoned the stdin mode when I added configs
 
     return config, search_query
 
@@ -266,7 +293,9 @@ def main():
         current_page = 1
         current_image = 0
         current_retry_delay = init_retry_delay
-        search_images = get_search_query_images(config.source_booru, config.source_api_key, search_query, page=current_page)
+        search_images = get_imgs_from_config(config, search_query, current_page)
+                        
+                        
 
         total_images = search_images["total"]
         while len(search_images["images"]) > 0:
@@ -317,7 +346,7 @@ def main():
 
             search_images = None
             while search_images is None:
-                search_images = get_search_query_images(config.source_booru, config.source_api_key, search_query, current_page)
+                search_images = get_imgs_from_config(config, search_query, current_page)
                 time.sleep(current_retry_delay)
                 if current_retry_delay < max_retry_delay:
                     current_retry_delay *= 2
