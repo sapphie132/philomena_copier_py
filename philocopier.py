@@ -101,7 +101,7 @@ def get_search_query_url(booru: str, api_key: str, query: str, page: int, filter
         req = f"https://{booru}/api/v1/json/search/images?key={api_key}&page={page}&per_page={per_page}&q={query}&sf=created_at&sd=asc"
 
     if filter_id is not None:
-        req = req + f"&{filter_id}"
+        req = req + f"&filter_id={filter_id}"
 
     return req
 
