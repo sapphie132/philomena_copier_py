@@ -156,11 +156,14 @@ def get_search_query_images(booru: str, api_key: str, query: str, page: int, fil
         return None
 
         
+rel_regex = compile(r"^(\/.+)$")
 def upload_image(image: dict, booru: str, api_key: str):
     upload_url = get_upload_url(booru, api_key)
 
     tag_string = ", ".join(image["tags"])
     image_to_upload = {"description": image["description"], "source_url": image["source_url"], "tag_input": tag_string}
+
+
     upload_image_body = {"image": image_to_upload, "url": image["view_url"]}
 
     try:
@@ -169,6 +172,8 @@ def upload_image(image: dict, booru: str, api_key: str):
             return True
         else:
             print(f"Error uploading image ({r.status_code})")
+            print(r.text)
+            print(upload_image_body)
             if r.status_code == requests.codes.bad_request:
                 return True # Lazy hack; technically, the upload did succeed, since the file is already on the server
                 print("This is because the hash is already present on the server")
@@ -307,6 +312,8 @@ def main():
                 current_retry_delay = init_retry_delay
                 image["description"] = change_description(image["description"], config)
                 image["tags"] = change_tags(image["tags"], config)
+                image_url = sub(rel_regex, lambda m: f"https://{config.source_booru}{m[1]}", image["view_url"])
+                image["view_url"] = image_url
 
                 image_id = image["id"]
                 print(f"Uploading image {current_image}/{total_images} ({image_id})")
