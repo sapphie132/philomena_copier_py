@@ -294,6 +294,19 @@ def change_description(description: str, config: Config):
     new_description = sub(relative_link_pattern, lambda m: replace_relative_link(m, config.source_booru), new_description)
     return new_description
 
+def change_image(image: dict, config: Config):
+    image["description"] = change_description(image["description"], config)
+    image["tags"] = change_tags(image["tags"], config)
+    if config.source_booru == "twibooru.org":
+        image_url = image["image"]
+    else:
+        image_url = image["view_url"]
+
+    image_url = sub(rel_regex, lambda m: f"https://{config.source_booru}{m[1]}", image_url)
+    image["view_url"] = image_url
+
+ 
+
 def main():
     try:
         config, search_query = get_config()
@@ -310,11 +323,7 @@ def main():
             for image in search_images["images"]:
                 current_image += 1
                 current_retry_delay = init_retry_delay
-                image["description"] = change_description(image["description"], config)
-                image["tags"] = change_tags(image["tags"], config)
-                image_url = sub(rel_regex, lambda m: f"https://{config.source_booru}{m[1]}", image["view_url"])
-                image["view_url"] = image_url
-
+                change_image(image, config)
                 image_id = image["id"]
                 print(f"Uploading image {current_image}/{total_images} ({image_id})")
 
