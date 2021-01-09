@@ -50,8 +50,9 @@ class Config(object):
     reverse_search: bool
     tag_mapping: dict
     source_filter_id: int
+    add_text: bool
 
-    def __init__(self, source_booru, source_api_key, target_api_key, target_booru, use_reverse = True, tag_mapping = None, source_filter_id = None):
+    def __init__(self, source_booru, source_api_key, target_api_key, target_booru, use_reverse = True, tag_mapping = None, source_filter_id = None, add_text = False):
         self.tag_mapping = tag_mapping
         self.source_booru = source_booru
         self.source_api_key = source_api_key
@@ -59,6 +60,7 @@ class Config(object):
         self.target_booru = target_booru
         self.reverse_search = use_reverse
         self.source_filter_id = source_filter_id
+        self.add_text = add_text
 
         # Strip the domain name
         self.source_booru_short = source_booru[:source_booru.rfind(".")]
@@ -210,11 +212,12 @@ def dict_to_config(d) -> Config:
             raise ValueError("tag_mapping has to be an object")
 
         source_filter_id = d.get("source_filter_id") # Allowed to be None
+        add_text = d.get("add_text", False)
 
         return Config(  source_booru = source_booru, source_api_key = source_api_key,\
                         target_api_key = target_api_key, target_booru = target_booru,\
                         use_reverse = reverse_search, tag_mapping = tag_mapping,\
-                        source_filter_id = source_filter_id)
+                        source_filter_id = source_filter_id, add_text = add_text)
 
 
 
@@ -289,13 +292,18 @@ def change_tags(tags: list, config: Config) -> list:
     result.append(f"{config.source_booru_short} import")
     return result
 
-def change_description(description: str, config: Config):
+def change_description(image: dict, config: Config):
+    description = image["description"]
+    image_id = image["id"]
     new_description = sub(image_link_pattern, lambda m: replace_image_link(m, config.source_booru), description)
     new_description = sub(relative_link_pattern, lambda m: replace_relative_link(m, config.source_booru), new_description)
+    if config.add_text:
+        import_text = f"Image imported from \"{config.source_booru_short}\":https://{config.source_booru}/{image_id}"
+        new_description = import_text + "\n\n\n" + new_description
     return new_description
 
 def change_image(image: dict, config: Config):
-    image["description"] = change_description(image["description"], config)
+    image["description"] = change_description(image, config)
     image["tags"] = change_tags(image["tags"], config)
     if config.source_booru == "twibooru.org":
         image_url = image["image"]
