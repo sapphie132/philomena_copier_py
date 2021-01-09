@@ -274,7 +274,7 @@ def get_config():
 
 def change_source(image: dict, config: Config):
     # No source given
-    if image["source_url"] is None:
+    if image["source_url"] is None or len(image["source_url"]) == 0:
         image["source_url"] = get_img_link(image, config)
 
 def change_tags(image: dict, config: Config) -> list:
