@@ -274,10 +274,10 @@ def get_config():
 
 def change_source(image: dict, config: Config):
     # No source given
-    if image["source"] is None:
+    if image["source_url"] is None:
         # derpibooru exclusive -> original source is derpibooru (for instance)
         if f"{config.source_booru_short} exclusive" in image.tags:
-            image["source"] = get_img_link(image, config)
+            image["source_url"] = get_img_link(image, config)
         else: 
             pass
             # Looks like OP forgot the source url (or forgot to tag it as derpi exclusive)
