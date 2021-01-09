@@ -52,7 +52,7 @@ class Config(object):
     source_filter_id: int
     add_text: bool
 
-    def __init__(self, source_booru, source_api_key, target_api_key, target_booru, use_reverse = True, tag_mapping = None, source_filter_id = None, add_text = False):
+    def __init__(self, source_booru, source_api_key, target_api_key, target_booru, use_reverse = True, tag_mapping = None, source_filter_id = None, add_text = True):
         self.tag_mapping = tag_mapping
         self.source_booru = source_booru
         self.source_api_key = source_api_key
@@ -212,7 +212,7 @@ def dict_to_config(d) -> Config:
             raise ValueError("tag_mapping has to be an object")
 
         source_filter_id = d.get("source_filter_id") # Allowed to be None
-        add_text = d.get("add_text", False)
+        add_text = d.get("add_text", True)
 
         return Config(  source_booru = source_booru, source_api_key = source_api_key,\
                         target_api_key = target_api_key, target_booru = target_booru,\
