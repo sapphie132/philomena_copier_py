@@ -272,7 +272,20 @@ def get_config():
 
     return config, search_query
 
-def change_tags(tags: list, config: Config) -> list:
+def change_source(image: dict, config: Config):
+    # No source given
+    if image["source"] is None:
+        # derpibooru exclusive -> original source is derpibooru (for instance)
+        if f"{config.source_booru_short} exclusive" in image.tags:
+            image["source"] = get_img_link(image, config)
+        else: 
+            pass
+            # Looks like OP forgot the source url (or forgot to tag it as derpi exclusive)
+            #image["tags"].append("source needed")
+
+
+def change_tags(image: dict, config: Config) -> list:
+    tags = image["tags"]
     if config.tag_mapping is not None:
         result = []
         for tag in tags:
@@ -290,7 +303,12 @@ def change_tags(tags: list, config: Config) -> list:
         result = tags
 
     result.append(f"{config.source_booru_short} import")
-    return result
+    image["tags"] = result
+
+# Gets the image link for the original image on the source booru
+def get_img_link(image: dict, config: Config):
+    image_id = image["id"]
+    return "https://{config.source_booru}/{image_id}"
 
 def change_description(image: dict, config: Config):
     description = image["description"]
@@ -298,13 +316,18 @@ def change_description(image: dict, config: Config):
     new_description = sub(image_link_pattern, lambda m: replace_image_link(m, config.source_booru), description)
     new_description = sub(relative_link_pattern, lambda m: replace_relative_link(m, config.source_booru), new_description)
     if config.add_text:
-        import_text = f"Image imported from \"{config.source_booru_short}\":https://{config.source_booru}/{image_id}"
-        new_description = import_text + "\n\n\n" + new_description
-    return new_description
+        import_text = f"Image imported from \"{config.source_booru_short}\":{get_img_link(image, config)}"
+        if new_description == "":
+            new_description = import_text + "\n(No description on original)"
+        else:
+            new_description = import_text + "\nOriginal Description:\n\n" + new_description
+    image["description"] = new_description
 
 def change_image(image: dict, config: Config):
-    image["description"] = change_description(image, config)
-    image["tags"] = change_tags(image["tags"], config)
+    change_description(image, config)
+    change_tags(image, config)
+
+    # Thanks, booru on rails
     if config.source_booru == "twibooru.org":
         image_url = image["image"]
     else:
@@ -313,7 +336,8 @@ def change_image(image: dict, config: Config):
     image_url = sub(rel_regex, lambda m: f"https://{config.source_booru}{m[1]}", image_url)
     image["view_url"] = image_url
 
- 
+    change_source(image, config)
+
 
 def main():
     try:
@@ -323,8 +347,6 @@ def main():
         current_image = 0
         current_retry_delay = init_retry_delay
         search_images = get_imgs_from_config(config, search_query, current_page)
-                        
-                        
 
         total_images = search_images["total"]
         while len(search_images["images"]) > 0:
