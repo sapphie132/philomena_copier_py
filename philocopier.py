@@ -275,14 +275,7 @@ def get_config():
 def change_source(image: dict, config: Config):
     # No source given
     if image["source_url"] is None:
-        # derpibooru exclusive -> original source is derpibooru (for instance)
-        if f"{config.source_booru_short} exclusive" in image.tags:
-            image["source_url"] = get_img_link(image, config)
-        else: 
-            pass
-            # Looks like OP forgot the source url (or forgot to tag it as derpi exclusive)
-            #image["tags"].append("source needed")
-
+        image["source_url"] = get_img_link(image, config)
 
 def change_tags(image: dict, config: Config) -> list:
     tags = image["tags"]
@@ -308,7 +301,7 @@ def change_tags(image: dict, config: Config) -> list:
 # Gets the image link for the original image on the source booru
 def get_img_link(image: dict, config: Config):
     image_id = image["id"]
-    return "https://{config.source_booru}/{image_id}"
+    return f"https://{config.source_booru}/{image_id}"
 
 def change_description(image: dict, config: Config):
     description = image["description"]
