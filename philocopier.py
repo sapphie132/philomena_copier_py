@@ -18,7 +18,7 @@ domain_pattern: Pattern = compile(r"^(?:https?:\/\/)?(.+?\.\w+?)\/?$")
 
 # Matches an image link, such as >>123, >>123t, or >>123p. The leftmost non-capturing group
 # is there to handle weird edge cases
-image_link_pattern: Pattern = compile(r"(?:^|[^=]{1,2}|[^=]=|^=)>>([0-9]+)(t|p|s?)")
+image_link_pattern: Pattern = compile(r"(^|[^=]{1,2}|[^=]=|^=)>>([0-9]+)(t|p|s?)")
 
 # Matches a relative link, which are done like: "this":http://example.com
 relative_link_pattern: Pattern = compile(r'"(.+)":(\/.+) ?')
@@ -126,7 +126,7 @@ def get_input_with_pattern(r: Pattern, prompt_text: str, error_text: str = "Inva
 
 # To be used only with match objects from image_link_pattern
 def replace_image_link(match: Match, booru: str):
-    return f"\"==>>{match[1]}{match[2]}==\":https://{booru}/images/{match[1]}"
+    return f"match[1]\"==>>{match[2]}{match[3]}==\":https://{booru}/images/{match[2]}"
 
 def replace_relative_link(match: Match, booru: str):
     return f"\"{match[1]}\":https://{booru}{match[2]}"
