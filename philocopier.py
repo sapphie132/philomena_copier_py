@@ -18,7 +18,7 @@ domain_pattern: Pattern = compile(r"^(?:https?:\/\/)?(.+?\.\w+?)\/?$")
 
 # Matches an image link, such as >>123, >>123t, or >>123p. The leftmost non-capturing group
 # is there to handle weird edge cases
-image_link_pattern: Pattern = compile(r"(?:^|[^=]{1,2}|[^=]=|^=)>>([0-9]+)(t|p|s?)")
+image_link_pattern: Pattern = compile(r"(^|[^=]{1,2}|[^=]=|^=)>>([0-9]+)(t|p|s?)")
 
 # Matches a relative link, which are done like: "this":http://example.com
 relative_link_pattern: Pattern = compile(r'"(.+)":(\/.+) ?')
@@ -50,8 +50,9 @@ class Config(object):
     reverse_search: bool
     tag_mapping: dict
     source_filter_id: int
+    add_text: bool
 
-    def __init__(self, source_booru, source_api_key, target_api_key, target_booru, use_reverse = True, tag_mapping = None, source_filter_id = None):
+    def __init__(self, source_booru, source_api_key, target_api_key, target_booru, use_reverse = True, tag_mapping = None, source_filter_id = None, add_text = True):
         self.tag_mapping = tag_mapping
         self.source_booru = source_booru
         self.source_api_key = source_api_key
@@ -59,6 +60,7 @@ class Config(object):
         self.target_booru = target_booru
         self.reverse_search = use_reverse
         self.source_filter_id = source_filter_id
+        self.add_text = add_text
 
         # Strip the domain name
         self.source_booru_short = source_booru[:source_booru.rfind(".")]
@@ -124,7 +126,7 @@ def get_input_with_pattern(r: Pattern, prompt_text: str, error_text: str = "Inva
 
 # To be used only with match objects from image_link_pattern
 def replace_image_link(match: Match, booru: str):
-    return f"\"==>>{match[1]}{match[2]}==\":https://{booru}/images/{match[1]}"
+    return f"match[1]\"==>>{match[2]}{match[3]}==\":https://{booru}/images/{match[2]}"
 
 def replace_relative_link(match: Match, booru: str):
     return f"\"{match[1]}\":https://{booru}{match[2]}"
@@ -210,11 +212,12 @@ def dict_to_config(d) -> Config:
             raise ValueError("tag_mapping has to be an object")
 
         source_filter_id = d.get("source_filter_id") # Allowed to be None
+        add_text = d.get("add_text", True)
 
         return Config(  source_booru = source_booru, source_api_key = source_api_key,\
                         target_api_key = target_api_key, target_booru = target_booru,\
                         use_reverse = reverse_search, tag_mapping = tag_mapping,\
-                        source_filter_id = source_filter_id)
+                        source_filter_id = source_filter_id, add_text = add_text)
 
 
 
@@ -269,7 +272,13 @@ def get_config():
 
     return config, search_query
 
-def change_tags(tags: list, config: Config) -> list:
+def change_source(image: dict, config: Config):
+    # No source given
+    if image["source_url"] is None or len(image["source_url"]) == 0:
+        image["source_url"] = get_img_link(image, config)
+
+def change_tags(image: dict, config: Config) -> list:
+    tags = image["tags"]
     if config.tag_mapping is not None:
         result = []
         for tag in tags:
@@ -287,12 +296,41 @@ def change_tags(tags: list, config: Config) -> list:
         result = tags
 
     result.append(f"{config.source_booru_short} import")
-    return result
+    image["tags"] = result
 
-def change_description(description: str, config: Config):
+# Gets the image link for the original image on the source booru
+def get_img_link(image: dict, config: Config):
+    image_id = image["id"]
+    return f"https://{config.source_booru}/{image_id}"
+
+def change_description(image: dict, config: Config):
+    description = image["description"]
+    image_id = image["id"]
     new_description = sub(image_link_pattern, lambda m: replace_image_link(m, config.source_booru), description)
     new_description = sub(relative_link_pattern, lambda m: replace_relative_link(m, config.source_booru), new_description)
-    return new_description
+    if config.add_text:
+        import_text = f"Image imported from \"{config.source_booru_short}\":{get_img_link(image, config)}"
+        if new_description == "":
+            new_description = import_text + "\n(No description on original)"
+        else:
+            new_description = import_text + "\nOriginal Description:\n\n" + new_description
+    image["description"] = new_description
+
+def change_image(image: dict, config: Config):
+    change_description(image, config)
+    change_tags(image, config)
+
+    # Thanks, booru on rails
+    if config.source_booru == "twibooru.org":
+        image_url = image["image"]
+    else:
+        image_url = image["view_url"]
+
+    image_url = sub(rel_regex, lambda m: f"https://{config.source_booru}{m[1]}", image_url)
+    image["view_url"] = image_url
+
+    change_source(image, config)
+
 
 def change_image(image: dict, config: Config):
     image["description"] = change_description(image["description"], config)
@@ -315,8 +353,6 @@ def main():
         current_image = 0
         current_retry_delay = init_retry_delay
         search_images = get_imgs_from_config(config, search_query, current_page)
-                        
-                        
 
         total_images = search_images["total"]
         while len(search_images["images"]) > 0:
