@@ -304,6 +304,7 @@ def get_img_link(image: dict, config: Config):
     return f"https://{config.source_booru}/{image_id}"
 
 def change_description(image: dict, config: Config):
+    assert type(image) == dict
     description = image["description"]
     image_id = image["id"]
     new_description = sub(image_link_pattern, lambda m: replace_image_link(m, config.source_booru), description)
@@ -317,6 +318,7 @@ def change_description(image: dict, config: Config):
     image["description"] = new_description
 
 def change_image(image: dict, config: Config):
+    assert type(image) == dict
     change_description(image, config)
     change_tags(image, config)
 
@@ -333,8 +335,8 @@ def change_image(image: dict, config: Config):
 
 
 def change_image(image: dict, config: Config):
-    image["description"] = change_description(image["description"], config)
-    image["tags"] = change_tags(image["tags"], config)
+    change_description(image, config)
+    change_tags(image, config)
     if config.source_booru == "twibooru.org":
         image_url = image["image"]
     else:
