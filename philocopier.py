@@ -231,7 +231,7 @@ def get_config():
             config_dict = json.load(config_file)
             config = dict_to_config(config_dict)
 
-        search_query = join(sys.argv[1])
+        search_query = sys.argv[1]
     else:
         print(f"Pylomena copier v{version}")
         print()
