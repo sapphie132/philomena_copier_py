@@ -184,7 +184,7 @@ def upload_image(image: dict, booru: str, api_key: str):
         print(f"RequestException occurred: {e}")
         return False
 
-version = "1.0"
+version = "1.2"
 # God I hate python. Just let me have a unified constructor
 def dict_to_config(d) -> Config:
         target_api_key = d.get("target_api_key")
@@ -223,7 +223,10 @@ def dict_to_config(d) -> Config:
 
 def get_config():
     if len(sys.argv) > 1:
-        config_path = "config.json" # yeah, can't be assed
+        if len(sys.argv) > 2:
+            config_path = sys.argv[-1]
+        else:
+            config_path = "config.json" 
         with open(config_path) as config_file:
             config_dict = json.load(config_file)
             config = dict_to_config(config_dict)
