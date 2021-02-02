@@ -225,13 +225,14 @@ def get_config():
     if len(sys.argv) > 1:
         if len(sys.argv) > 2:
             config_path = sys.argv[-1]
+            search_query = " ".join(sys.argv[1:-1])
         else:
-            config_path = "config.json" 
+            config_path = "config.json"
+            search_query = sys.argv[1]
         with open(config_path) as config_file:
             config_dict = json.load(config_file)
             config = dict_to_config(config_dict)
 
-        search_query = sys.argv[1]
     else:
         print(f"Pylomena copier v{version}")
         print()
