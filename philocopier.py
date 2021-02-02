@@ -280,6 +280,8 @@ def change_source(image: dict, config: Config):
     # No source given
     if image["source_url"] is None or len(image["source_url"]) == 0:
         image["source_url"] = get_img_link(image, config)
+    elif not image["source_url"].startswith("http"):
+        image["source_url"] = "http://" + image["source_url"]
 
 def change_tags(image: dict, config: Config) -> list:
     tags = image["tags"]
