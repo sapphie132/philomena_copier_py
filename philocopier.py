@@ -339,20 +339,6 @@ def change_image(image: dict, config: Config):
 
     change_source(image, config)
 
-
-def change_image(image: dict, config: Config):
-    change_description(image, config)
-    change_tags(image, config)
-    if config.source_booru == "twibooru.org":
-        image_url = image["image"]
-    else:
-        image_url = image["view_url"]
-
-    image_url = sub(rel_regex, lambda m: f"https://{config.source_booru}{m[1]}", image_url)
-    image["view_url"] = image_url
-
- 
-
 def main():
     try:
         config, search_query = get_config()
