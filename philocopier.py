@@ -126,7 +126,7 @@ def get_input_with_pattern(r: Pattern, prompt_text: str, error_text: str = "Inva
 
 # To be used only with match objects from image_link_pattern
 def replace_image_link(match: Match, booru: str):
-    return f"match[1]\"==>>{match[2]}{match[3]}==\":https://{booru}/images/{match[2]}"
+    return f"{match[1]}\"==>>{match[2]}{match[3]}==\":https://{booru}/images/{match[2]}"
 
 def replace_relative_link(match: Match, booru: str):
     return f"\"{match[1]}\":https://{booru}{match[2]}"
