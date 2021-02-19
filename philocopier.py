@@ -35,11 +35,11 @@ source_filter_pattern = compile(r"^d+$")
 max_attempts_at_max_delay = 2
 
 # Retry delays, in seconds
-init_retry_delay = 0.25
-max_retry_delay = 256
+init_retry_delay = 1/16
+max_retry_delay = 32
 
 per_page = 50
-timeout_seconds = 60
+timeout_seconds = 120
 
 class Config(object):
     target_api_key: str
